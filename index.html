@@ -416,10 +416,10 @@ html, body {
 
       <div class="divider"></div>
 
-      <div class="toggle-row field-anthropic-only" id="thinkingRow">
+      <div class="toggle-row" id="thinkingRow">
         <div>
           <div class="toggle-label">Extended Thinking</div>
-          <div class="toggle-sublabel">深度思考（仅 Anthropic 直连可用）</div>
+          <div class="toggle-sublabel">深度思考，可以看到思考过程</div>
         </div>
         <label class="toggle-switch">
           <input type="checkbox" id="thinkingEnabled" onchange="saveSettings()">
@@ -427,7 +427,7 @@ html, body {
         </label>
       </div>
 
-      <div class="form-group field-anthropic-only" id="thinkingBudgetGroup" style="display:none">
+      <div class="form-group" id="thinkingBudgetGroup" style="display:none">
         <label class="form-label">Thinking Budget</label>
         <input type="number" class="form-input" id="thinkingBudget" value="10000" min="1024" max="128000" step="1024" onchange="saveSettings()">
       </div>
@@ -565,11 +565,9 @@ function onProviderChange(doSave = true) {
   const endpointGroup = document.getElementById('endpointGroup');
   endpointGroup.classList.toggle('dimmed', isOR);
 
-  // Show/hide thinking (only for anthropic direct)
+  // Only endpoint is anthropic-only; thinking works for both providers
   document.querySelectorAll('.field-anthropic-only').forEach(el => {
-    if (el.id !== 'endpointGroup') {
-      el.classList.toggle('dimmed', isOR);
-    }
+    el.classList.toggle('dimmed', isOR);
   });
 
   // Populate model list
@@ -804,6 +802,14 @@ async function callOpenRouter(s) {
     max_tokens: s.maxTokens || 8192,
     stream: useStream,
   };
+
+  // Add reasoning/thinking support for OpenRouter
+  if (s.thinkingEnabled) {
+    body.reasoning = {
+      effort: 'high',
+      max_tokens: s.thinkingBudget || 10000,
+    };
+  }
 
   const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
     method: 'POST',
