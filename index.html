@@ -805,10 +805,14 @@ async function callOpenRouter(s) {
 
   // Add reasoning/thinking support for OpenRouter
   if (s.thinkingEnabled) {
+    const reasoningBudget = s.thinkingBudget || 10000;
     body.reasoning = {
-      effort: 'high',
-      max_tokens: s.thinkingBudget || 10000,
+      max_tokens: reasoningBudget,
     };
+    // OpenRouter requires: max_tokens must be strictly greater than reasoning budget
+    if (body.max_tokens <= reasoningBudget) {
+      body.max_tokens = reasoningBudget + 4096;
+    }
   }
 
   const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
@@ -877,7 +881,7 @@ async function handleOpenRouterStream(response) {
         const delta = event.choices?.[0]?.delta;
 
         if (delta?.reasoning) {
-          // Some OpenRouter models return reasoning
+          // OpenRouter legacy format: reasoning as string
           if (!reasoningEl) {
             const toggle = document.createElement('button');
             toggle.className = 'thinking-toggle';
@@ -891,6 +895,28 @@ async function handleOpenRouterStream(response) {
           }
           reasoningText += delta.reasoning;
           reasoningEl.innerHTML = renderMarkdown(reasoningText);
+        }
+
+        // OpenRouter new format: reasoning_details array
+        if (delta?.reasoning_details && Array.isArray(delta.reasoning_details)) {
+          for (const detail of delta.reasoning_details) {
+            const text = detail.text || detail.summary || '';
+            if (text) {
+              if (!reasoningEl) {
+                const toggle = document.createElement('button');
+                toggle.className = 'thinking-toggle';
+                toggle.innerHTML = '<span class="arrow">▸</span> 思考过程';
+                toggle.onclick = () => { toggle.classList.toggle('open'); reasoningEl.classList.toggle('open'); };
+                bubble.insertBefore(toggle, responseEl);
+                reasoningEl = document.createElement('div');
+                reasoningEl.className = 'thinking-content';
+                bubble.insertBefore(reasoningEl, responseEl);
+                setStatus('正在思考...');
+              }
+              reasoningText += text;
+              reasoningEl.innerHTML = renderMarkdown(reasoningText);
+            }
+          }
         }
 
         if (delta?.content) {
